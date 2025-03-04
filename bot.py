@@ -9,6 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import redis
 import azure.cognitiveservices.speech as speechsdk
 import nest_asyncio
+from botbuilder.schema import ChannelAccount , Activity, ActivityTypes
+
 nest_asyncio.apply()
 
 # Azure Cognitive Search imports
@@ -347,7 +349,7 @@ def detect_critical_issue(text):
 # ASYNCHRONOUS VOICE CHAT FUNCTION
 # ------------------------------------------------------------------
 
-async def voice_chat(user_query):
+async def voice_chat(turn_context: TurnContext, user_query: str):
     if not user_query:
         return "في انتظار اوامرك"
     if clean_text(user_query) in ["إنهاء", "خروج"]:
@@ -356,7 +358,12 @@ async def voice_chat(user_query):
     if detect_critical_issue(user_query):
         return "هذه المشكلة تحتاج إلى تدخل بشري. سأقوم بالاتصال بخدمة العملاء لدعمك."
     response = await get_response(user_query)
-    return response
+    activity: Activity = turn_context.activity
+    bot_id = activity.recipient.id
+    return Activity(
+    type=ActivityTypes.message,
+    from_property=ChannelAccount(id=bot_id),  # Bot as the sender
+    text=response)
 
 # ------------------------------------------------------------------
 # Bot Implementation with Speaker Mode
@@ -366,7 +373,7 @@ class MyBot(ActivityHandler):
     async def on_message_activity(self, turn_context: TurnContext):
         user_query = turn_context.activity.text
         print(f"Received message: {user_query}")
-        response_text = await voice_chat(user_query)
+        response_text =  await voice_chat(turn_context, user_query)
         
         # Send text response to emulator with TTS (speak parameter)
         await turn_context.send_activity(response_text, speak=response_text)
