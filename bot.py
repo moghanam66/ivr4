@@ -18,9 +18,9 @@ from azure.core.credentials import AzureKeyCredential
 
 # Bot Framework dependencies
 from botbuilder.core import ActivityHandler, TurnContext
-from botbuilder.schema import ChannelAccount , Activity, ActivityTypes
+from botbuilder.schema import ChannelAccount
 
-# RT client for GPT‑4o realtime fallback (make sure the rtclient package is installed)
+# RT client for GPT‑4o realtime fallback (ensure the rtclient package is installed)
 from rtclient import RTLowLevelClient, ResponseCreateMessage, ResponseCreateParams
 
 # ------------------------------------------------------------------
@@ -152,7 +152,9 @@ try:
 except Exception as e:
     print(f"❌ Failed to connect to Redis: {e}")
 
-
+# ------------------------------------------------------------------
+# SEARCH & RESPONSE FUNCTIONS
+# ------------------------------------------------------------------
 
 def check_redis_cache(query):
     try:
@@ -287,7 +289,9 @@ async def get_response(user_query):
     else:
         return "عذرًا، لم أتمكن من العثور على إجابة. يرجى المحاولة مرة أخرى لاحقًا."
 
-
+# ------------------------------------------------------------------
+# SPEECH RECOGNITION & SYNTHESIS SETUP
+# ------------------------------------------------------------------
 
 speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
 speech_config.speech_recognition_language = "ar-EG"
@@ -308,13 +312,14 @@ def recognize_speech():
 def speak_response(text):
     audio_output = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_output)
-    result = synthesizer.speak_text_async(text).get()
+    result = synthesizer.speak_text(text)
     if result.reason == speechsdk.ResultReason.Canceled:
         cancellation = result.cancellation_details
-        print("Speech synthesis canceled:")
-        print("  Reason: {}".format(cancellation.reason))
-        print("  Error Details: {}".format(cancellation.error_details))
+        print(f"Speech synthesis failed: {cancellation.error_details}")
 
+# ------------------------------------------------------------------
+# HELPER FUNCTIONS
+# ------------------------------------------------------------------
 
 def clean_text(text):
     return text.strip(" .،!؛؟").lower()
@@ -329,7 +334,6 @@ def detect_critical_issue(text):
         "تم استغلال ثغرة أمنية في الشبكة.",
         "هناك محاولة وصول غير مصرح بها إلى الملفات السرية."
     ]
-
     trigger_embeddings = np.array([get_embedding(sent) for sent in trigger_sentences])
     text_embedding = np.array(get_embedding(text)).reshape(1, -1)
     similarities = cosine_similarity(text_embedding, trigger_embeddings)
@@ -339,6 +343,9 @@ def detect_critical_issue(text):
         return True
     return False
 
+# ------------------------------------------------------------------
+# ASYNCHRONOUS VOICE CHAT FUNCTION
+# ------------------------------------------------------------------
 
 async def voice_chat(user_query):
     if not user_query:
@@ -349,55 +356,41 @@ async def voice_chat(user_query):
     if detect_critical_issue(user_query):
         return "هذه المشكلة تحتاج إلى تدخل بشري. سأقوم بالاتصال بخدمة العملاء لدعمك."
     response = await get_response(user_query)
-    activity: Activity = turn_context.activity
-    bot_id = activity.recipient.id
-    return Activity(
-    type=ActivityTypes.message,
-    from_property=ChannelAccount(id=bot_id),  # Bot as the sender
-    text=response)
-    #return response
+    return response
 
-
-
-# class MyBot(ActivityHandler):
-#     async def on_message_activity(self, turn_context: TurnContext):
-#         user_query = turn_context.activity.text
-#         print(f"Received message: {user_query}")
-#         response_text =  await voice_chat(turn_context, user_query)
-#         await turn_context.send_activity(response_text)
-
-#     async def on_members_added_activity(
-#         self, members_added: ChannelAccount, turn_context: TurnContext
-#     ):
-#         for member in members_added:
-#             if member.id != turn_context.activity.recipient.id:
-#                 welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
-#                 await turn_context.send_activity(welcome_message)
+# ------------------------------------------------------------------
+# Bot Implementation with Speaker Mode
+# ------------------------------------------------------------------
 
 class MyBot(ActivityHandler):
-   async def on_message_activity(self, turn_context: TurnContext):
-       user_query = turn_context.activity.text
-       print(f"Received message: {user_query}")
-       response_text = await voice_chat(user_query)
-       # Send text response to emulator with TTS (speak parameter)
-       await turn_context.send_activity(response_text, speak=response_text)
-       # Optionally, perform local speech synthesis using the speaker
-       await self.speak_response_async(response_text)
-   async def on_members_added_activity(self, members_added: ChannelAccount, turn_context: TurnContext):
-       for member in members_added:
-           if member.id != turn_context.activity.recipient.id:
-               welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
-               await turn_context.send_activity(welcome_message, speak=welcome_message)
-               await self.speak_response_async(welcome_message)
-   async def speak_response_async(self, text):
-       """Async wrapper for the speech synthesis."""
-       loop = asyncio.get_event_loop()
-       await loop.run_in_executor(None, self.speak_response, text)
-   def speak_response(self, text):
-       """Synchronous speech synthesis."""
-       audio_output = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
-       synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_output)
-       result = synthesizer.speak_text(text)
-       if result.reason == speechsdk.ResultReason.Canceled:
-           cancellation = result.cancellation_details
-           print(f"Speech synthesis failed: {cancellation.error_details}")
+    async def on_message_activity(self, turn_context: TurnContext):
+        user_query = turn_context.activity.text
+        print(f"Received message: {user_query}")
+        response_text = await voice_chat(user_query)
+        
+        # Send text response to emulator with TTS (speak parameter)
+        await turn_context.send_activity(response_text, speak=response_text)
+        
+        # Optionally, perform local speech synthesis using the speaker
+        await self.speak_response_async(response_text)
+
+    async def on_members_added_activity(self, members_added: ChannelAccount, turn_context: TurnContext):
+        for member in members_added:
+            if member.id != turn_context.activity.recipient.id:
+                welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
+                await turn_context.send_activity(welcome_message, speak=welcome_message)
+                await self.speak_response_async(welcome_message)
+
+    async def speak_response_async(self, text):
+        """Async wrapper for the speech synthesis."""
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self.speak_response, text)
+
+    def speak_response(self, text):
+        """Synchronous speech synthesis."""
+        audio_output = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
+        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_output)
+        result = synthesizer.speak_text(text)
+        if result.reason == speechsdk.ResultReason.Canceled:
+            cancellation = result.cancellation_details
+            print(f"Speech synthesis failed: {cancellation.error_details}")
