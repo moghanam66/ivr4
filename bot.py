@@ -18,7 +18,7 @@ from azure.core.credentials import AzureKeyCredential
 
 # Bot Framework dependencies
 from botbuilder.core import ActivityHandler, TurnContext
-from botbuilder.schema import ChannelAccount
+from botbuilder.schema import ChannelAccount , Activity, ActivityTypes
 
 # RT client for GPT‑4o realtime fallback (make sure the rtclient package is installed)
 from rtclient import RTLowLevelClient, ResponseCreateMessage, ResponseCreateParams
@@ -349,7 +349,13 @@ async def voice_chat(user_query):
     if detect_critical_issue(user_query):
         return "هذه المشكلة تحتاج إلى تدخل بشري. سأقوم بالاتصال بخدمة العملاء لدعمك."
     response = await get_response(user_query)
-    return response
+    activity: Activity = turn_context.activity
+    bot_id = activity.recipient.id
+    return Activity(
+    type=ActivityTypes.message,
+    from_property=ChannelAccount(id=bot_id),  # Bot as the sender
+    text=response)
+    #return response
 
 
 
@@ -357,7 +363,7 @@ class MyBot(ActivityHandler):
     async def on_message_activity(self, turn_context: TurnContext):
         user_query = turn_context.activity.text
         print(f"Received message: {user_query}")
-        response_text = await voice_chat(user_query)
+        response_text =  await voice_chat(turn_context, user_query)
         await turn_context.send_activity(response_text)
 
     async def on_members_added_activity(
