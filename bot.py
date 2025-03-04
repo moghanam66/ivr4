@@ -9,6 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import redis
 import azure.cognitiveservices.speech as speechsdk
 import nest_asyncio
+from botbuilder.schema import ChannelAccount , Activity, ActivityTypes
+
 nest_asyncio.apply()
 
 # Azure Cognitive Search imports
@@ -362,7 +364,6 @@ async def voice_chat(turn_context: TurnContext, user_query: str):
     type=ActivityTypes.message,
     from_property=ChannelAccount(id=bot_id),  # Bot as the sender
     text=response)
- 
 
 # ------------------------------------------------------------------
 # Bot Implementation with Speaker Mode
@@ -373,10 +374,10 @@ class MyBot(ActivityHandler):
         user_query = turn_context.activity.text
         print(f"Received message: {user_query}")
         response_text =  await voice_chat(turn_context, user_query)
-       
+        
         # Send text response to emulator with TTS (speak parameter)
         await turn_context.send_activity(response_text, speak=response_text)
-       
+        
         # Optionally, perform local speech synthesis using the speaker
         await self.speak_response_async(response_text)
 
@@ -399,4 +400,4 @@ class MyBot(ActivityHandler):
         result = synthesizer.speak_text(text)
         if result.reason == speechsdk.ResultReason.Canceled:
             cancellation = result.cancellation_details
-            print(f"Speech synthesis failed: {cancellation.error_details}") 
+            print(f"Speech synthesis failed: {cancellation.error_details}")
