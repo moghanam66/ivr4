@@ -387,7 +387,7 @@ class MyBot(ActivityHandler):
         activity.speak = ssml_response
             
             # Send the formatted activity
-        await turn_context.send_activity(activity)
+        await turn_context.send_activity(activity,speak_response(response_text),speak=ssml_response)
         return activity
 
     async def on_members_added_activity(self, members_added: ChannelAccount, turn_context: TurnContext):
@@ -399,7 +399,7 @@ class MyBot(ActivityHandler):
                                     </speak>"""
                 activity = MessageFactory.text(welcome_message)
                 activity.speak = ssml_welcome
-                await turn_context.send_activity(welcome_message, speak_response(welcome_message))
+                await turn_context.send_activity(welcome_message, speak_response(welcome_message),speak=ssml_welcome)
                 return activity
                 
 
