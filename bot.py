@@ -24,6 +24,8 @@ from botbuilder.schema import ChannelAccount
 
 # RT client for GPT‑4o realtime fallback (ensure the rtclient package is installed)
 from rtclient import RTLowLevelClient, ResponseCreateMessage, ResponseCreateParams
+from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext,MessageFactory
+
 
 # ------------------------------------------------------------------
 # Configuration for Azure OpenAI, GPT‑4o realtime, Azure Search, Redis, Speech
@@ -375,18 +377,31 @@ class MyBot(ActivityHandler):
         print(f"Received message: {user_query}")
         response_text =  await voice_chat(turn_context, user_query)
         
-        # Send text response to emulator with TTS (speak parameter)
-        await turn_context.send_activity(response_text, speak=response_text)
-        
-        # Optionally, perform local speech synthesis using the speaker
-        await self.speak_response_async(response_text)
+        # Create proper SSML with Arabic voice
+        ssml_response = f"""<speak version='1.0' xmlns='https://www.w3.org/2001/10/synthesis' xml:lang='ar-EG'>
+                              <voice name='ar-EG-ShakirNeural'>{response_text}</voice>
+                              </speak>"""
+            
+            # Create activity with both text and SSML
+        activity = MessageFactory.text(response_text)
+        activity.speak = ssml_response
+            
+            # Send the formatted activity
+        await turn_context.send_activity(activity)
+        return activity
 
     async def on_members_added_activity(self, members_added: ChannelAccount, turn_context: TurnContext):
         for member in members_added:
             if member.id != turn_context.activity.recipient.id:
                 welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
-                await turn_context.send_activity(welcome_message, speak=welcome_message)
-                await self.speak_response_async(welcome_message)
+                ssml_welcome = f"""<speak version='1.0' xmlns='https://www.w3.org/2001/10/synthesis' xml:lang='ar-EG'>
+                                    <voice name='ar-EG-ShakirNeural'>{welcome_message}</voice>
+                                    </speak>"""
+                activity = MessageFactory.text(welcome_message)
+                activity.speak = ssml_welcome
+                await turn_context.send_activity(welcome_message, speak_response(welcome_message))
+                return activity
+                
 
     async def speak_response_async(self, text):
         """Async wrapper for the speech synthesis."""
