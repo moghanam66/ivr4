@@ -359,17 +359,45 @@ async def voice_chat(user_query):
 
 
 
-class MyBot(ActivityHandler):
-    async def on_message_activity(self, turn_context: TurnContext):
-        user_query = turn_context.activity.text
-        print(f"Received message: {user_query}")
-        response_text =  await voice_chat(turn_context, user_query)
-        await turn_context.send_activity(response_text)
+# class MyBot(ActivityHandler):
+#     async def on_message_activity(self, turn_context: TurnContext):
+#         user_query = turn_context.activity.text
+#         print(f"Received message: {user_query}")
+#         response_text =  await voice_chat(turn_context, user_query)
+#         await turn_context.send_activity(response_text)
 
-    async def on_members_added_activity(
-        self, members_added: ChannelAccount, turn_context: TurnContext
-    ):
-        for member in members_added:
-            if member.id != turn_context.activity.recipient.id:
-                welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
-                await turn_context.send_activity(welcome_message)
+#     async def on_members_added_activity(
+#         self, members_added: ChannelAccount, turn_context: TurnContext
+#     ):
+#         for member in members_added:
+#             if member.id != turn_context.activity.recipient.id:
+#                 welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
+#                 await turn_context.send_activity(welcome_message)
+
+class MyBot(ActivityHandler):
+   async def on_message_activity(self, turn_context: TurnContext):
+       user_query = turn_context.activity.text
+       print(f"Received message: {user_query}")
+       response_text = await voice_chat(user_query)
+       # Send text response to emulator with TTS (speak parameter)
+       await turn_context.send_activity(response_text, speak=response_text)
+       # Optionally, perform local speech synthesis using the speaker
+       await self.speak_response_async(response_text)
+   async def on_members_added_activity(self, members_added: ChannelAccount, turn_context: TurnContext):
+       for member in members_added:
+           if member.id != turn_context.activity.recipient.id:
+               welcome_message = "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
+               await turn_context.send_activity(welcome_message, speak=welcome_message)
+               await self.speak_response_async(welcome_message)
+   async def speak_response_async(self, text):
+       """Async wrapper for the speech synthesis."""
+       loop = asyncio.get_event_loop()
+       await loop.run_in_executor(None, self.speak_response, text)
+   def speak_response(self, text):
+       """Synchronous speech synthesis."""
+       audio_output = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
+       synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_output)
+       result = synthesizer.speak_text(text)
+       if result.reason == speechsdk.ResultReason.Canceled:
+           cancellation = result.cancellation_details
+           print(f"Speech synthesis failed: {cancellation.error_details}")
