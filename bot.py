@@ -399,4 +399,4 @@ class MyBot(ActivityHandler):
         result = synthesizer.speak_text(text)
         if result.reason == speechsdk.ResultReason.Canceled:
             cancellation = result.cancellation_details
-            print(f"Speech synthesis failed: {cancellation.error_details}")
+            print(f"Speech synthesis failed: {cancellation.error_details}") 
