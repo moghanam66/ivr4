@@ -19,3 +19,5 @@ azure-cognitiveservices-speech==1.42.0
 SpeechRecognition==3.14.1
 azure-identity==1.19.0
 azure-common==1.1.28
+speechrecognition
+pyttsx3
